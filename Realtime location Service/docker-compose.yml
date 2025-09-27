@@ -1,0 +1,60 @@
+services:
+
+  kafka:
+    image: confluentinc/cp-kafka:8.0.0
+    hostname: kafka
+    ports:
+      - "9094:9094"
+      - "9092:9092"
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://kafka:29093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:9092"]
+      interval: 5s
+      retries: 10
+
+  kafka-rest:
+    image: confluentinc/cp-kafka-rest:8.0.0
+    ports: ["8082:8082"]
+    environment:
+      KAFKA_REST_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_REST_LISTENERS: http://0.0.0.0:8082
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # fastapi-ws:
+  #   build: .
+  #   ports: ["8000:8000"]
+  #   environment:
+  #     BOOTSTRAP: kafka:9092          # internal hostname
+  #     TOPIC: driver-positions
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+  #     kafka-rest:
+  #       condition: service_healthy
+
+  # producer:
+  #   build: .
+  #   command: sh -c "pip install aiohttp asyncio && python driver_producer.py"
+  #   environment:
+  #     REST_PROXY: http://kafka-rest:8082   # internal name
+  #   depends_on:
+  #     kafka-rest:
+  #       condition: service_healthy
